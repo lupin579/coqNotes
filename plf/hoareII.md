@@ -70,6 +70,7 @@ so we need to find the right assertions.
 The work of finding right assertions can be done almost automatically, except for **finding loop variants**.
 
 #### Example: Swapping
+> how to decorate assignment command
 Given the following program:
 ```Coq
        X := X + Y;
@@ -94,3 +95,65 @@ The workflow can be summaried as follows:
    At each step, we obtain the precondition of the assignment from its postcondition by substituting the assigned variable with the right side of the assignment.
 4. Finally, we verify the implication of (1) to (2) -- to prove the step from (1) to (2) is a valid use of the law of consequence.
 
+#### Example: Simple Conditionals
+> how to decorate conditional command
+Here is a simple decorated program using conditionals:
+```Coq
+      (1)   {{ True }} (* precondition from specification *)
+              if X ≤ Y then
+      (2)                    {{ True ∧ X ≤ Y }} ->> (* conjoin precondition(1) and guard to obtain this *) 
+      (3)                    {{ (Y - X) + X = Y ∨ (Y - X) + Y = X }} (* obtain from substitution of (4) *)
+                Z := Y - X
+      (4)                    {{ Z + X = Y ∨ Z + Y = X }} (* copy from postcondition(8) *)
+              else
+      (5)                    {{ True ∧ ~(X ≤ Y) }} ->> (* conjoin precondition(1) and negation of guard to obtain this *)
+      (6)                    {{ (X - Y) + X = Y ∨ (X - Y) + Y = X }} (* obtain from substitution of (7) *)
+                Z := X - Y
+      (7)                    {{ Z + X = Y ∨ Z + Y = X }} (* copy from postcondition (8) *)
+              end
+      (8)   {{ Z + X = Y ∨ Z + Y = X }}
+```
+These decorations can be constructed as follows:
+1. Start with the precondition(1) and postcondition(8)
+2. Following the format dictated by the **hoare_if rule**
+   we copy postcondition(8) to (4) and (7) -- because we all konw that the postcondition of a whole conditional command is the postcondition of each of its branches
+   we conjoin the precondition(1) with the guard of conditional to obtain (2) -- we konw that we will excute the first branch when the guard holds
+   we conjoin the precondition(1) with the negation of the guard of conditional to obtain (5) -- we konw that we will excute the second branch when the negation of guard holds
+3. Following the format dictated by the **hoare_asgn**
+   we do the substitution(substitute left with right) to obtain (3) and (6)
+4. Finally, we verify these two implications: (2) implies (3), (5) implies (6).
+Note: both of these implications crucially depend on the ordering of `X` and `Y` obtained from the guard. Because `n - m + m = n` does **not** hold for arbitrary **natural** numbers(e.g., 3-5+5=5)
+
+#### Example: Reduce to Zero
+> how to decorate while command
+Here is a `while` loop that is so simple that `True` suffices as a loop invariant.
+```Coq
+        (1)    {{ True }} (* the precondition(also the invariant for the following while loop) from specification *)
+                 while X ≠ 0 do
+        (2)                  {{ True ∧ X ≠ 0 }} ->> (* conjoin invariant with the guard of while loop *)
+        (3)                  {{ True }} (* obtain from substitution of (4) *)
+                   X := X - 1
+        (4)                  {{ True }} (* copy from (1) ???point of this decoration??? *)
+                 end
+        (5)    {{ True ∧ ~(X ≠ 0) }} ->> (* conjoin the invariant and the negation of the guard of the while loop *)
+        (6)    {{ X = 0 }} (* the postcondition from specification *)
+```
+The decorations can be constructed as follows:
+1. Start with the outer precondition(1) and postcondition(6)
+2. Following the format dictated by the **hoare_while rule**
+   we copy (1) to (4) -- based on the **hoare_while rule**: the invariant will not change after the execution of the body of while loop
+   we conjoin (1) with the guard to obtain (2) -- based on the **hoare_while rule**: if the guard holds, then the body will be executed and we still need the invariant Why???????????????????????
+   we conjoin (1) with the negation of the guard to obtain (5) -- when the guard doesn't hold no longer, then we can reach the place after the `end` notation
+3. Because the final postcondition(6) doesn't syntactically match (5), so we add an implication between them
+4. Following the format dictated by the **hoare_asgn rule**
+   we do the substitution for (4) to obtain (3)
+5. We add the implication between (5) and (6)
+6. Finally we check the implications do hold; both are trivial.
+
+#### Example: Division
+> how to decorate more complex while loop
+
+#### From Decorated Programs to Formal Proofs
+
+
+### Formal Decorated Programs
