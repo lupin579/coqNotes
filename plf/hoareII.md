@@ -152,6 +152,39 @@ The decorations can be constructed as follows:
 
 #### Example: Division
 > how to decorate more complex while loop
+The following Imp program calculated the integer quotient and remainder of parameters `m` and `n`.
+```Coq
+       X := m;
+       Y := 0;
+       while n <= X do
+         X := X - n;
+         Y := Y + 1
+       end;
+```
+In order to give a specification to this program we need to remember that dividing `m` by `n`
+produces a remainder `X` and a quotient `Y` such that `n * Y + X = m /\ X < n`.
+
+And we can find the invariant easily: `n * Y + X = m`, we can use this to decorate the program.
+```Coq
+      (1)  {{ True }} ->> (* precondition from specification *)
+      (2)  {{ n × 0 + m = m }} (* substitution from (3) *)
+             X := m;
+      (3)                     {{ n × 0 + X = m }} (* substitution from (4) *)
+             Y := 0;
+      (4)                     {{ n × Y + X = m }} (* the invariant we find above *)
+             while n ≤ X do
+      (5)                     {{ n × Y + X = m ∧ n ≤ X }} ->> (* if we want enter this body, we should ensure that the guard holds *)
+      (6)                     {{ n × (Y + 1) + (X - n) = m }} (* substitution from (7) *)
+               X := X - n;
+      (7)                     {{ n × (Y + 1) + X = m }} (* substitution from (8) *)
+               Y := Y + 1
+      (8)                     {{ n × Y + X = m }} (* copy from (4) the invariant doesn't change after every execution of loop body *)
+             end
+      (9)  {{ n × Y + X = m ∧ ¬(n ≤ X) }} ->> (* if we want to get out of the loop body, we need to ensure that the negation of loop guard holds and conjoin it with invariant *)
+     (10)  {{ n × Y + X = m ∧ X < n }} (* the postcondition from specification *)
+```
+
+The construction of this decoration is same as the examples before.
 
 #### From Decorated Programs to Formal Proofs
 

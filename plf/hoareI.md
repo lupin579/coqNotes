@@ -309,4 +309,66 @@ Informally, a nice way of displaying a proof using the sequencing rule is as a "
 
 #### Conditionals
 
+First attempt:
+
+        {{P}} c1 {{Q}}
+        {{P}} c2 {{Q}}
+--------------------------------
+{{P}} if b then c1 else c2 {{Q}}
+
+We can find that we missing some something, we forget to add the state of guard(`b`) to it.
+
+So the modified one is
+        {{P /\  b}} c1 {{Q}}
+        {{P /\ ~b}} c2 {{Q}}
+----------------------------------- (hoare_if)
+{{P}} if b then c1 else c2 end {{Q}}
+
+If we want to formalize this rule, we need to do some preliminary work:
+ lift `b` to type `assertion`
+Because the `P` on the left-hand side of the conjuction has type `assertion`
+So we'll write `bassn b` for the assertion "the boolean expression `b` evaluates to `true`(in the given state)."
+
+```Coq
+Definition bassn b : Assertion :=
+  fun st => (beval st b = true).
+Coercion bassn : bexp >-> Assertion.
+Arguments bassn /.
+```
+A useful fact about `bassn`:
+```Coq
+Lemma bexp_eval_false : ∀ b st,
+  beval st b = false -> ~ ((bassn b) st).
+Proof. congruence. Qed.
+
+Hint Resolve bexp_eval_false : core.
+```
+
+Now we can formalize the Hoare proof rule for conditionals and prove it correct.
+
+```Coq
+Theorem hoare_if : ∀ P Q (b:bexp) c1 c2,
+  {{ P /\   b}} c1 {{Q}} ->
+  {{ P /\ ~ b}} c2 {{Q}} ->
+  {{P}} if b then c1 else c2 end {{Q}}.
+
+(* following is the unwrapped version *)
+Theorem hoare_if : ∀ P Q b c1 c2,
+  {{fun st ⇒ P st ∧ bassn b st}} c1 {{Q}} →
+  {{fun st ⇒ P st ∧ ¬(bassn b st)}} c2 {{Q}} →
+  {{P}} if b then c1 else c2 end {{Q}}.
+Proof.
+  intros P Q b c1 c2 HTrue HFalse st st' HE HP.
+  inversion HE; subst; eauto.
+Qed.
+```
+
 #### While Loops
+
+The Hoare rule for `while` is based on the idea of an invariant.
+> invariant: an assertion whose truth is guaranteed before and after executing a command.
+An assertion `P` is an invariant of `c` if
+    {{P}} c {{P}}
+holds. **Note that** in the middle of executing `c`, the invariant might temporarily become false, but by the end of c, it must be restored. 
+
+
