@@ -187,6 +187,32 @@ And we can find the invariant easily: `n * Y + X = m`, we can use this to decora
 The construction of this decoration is same as the examples before.
 
 #### From Decorated Programs to Formal Proofs
+Note that we do *not* unfold the definition of hoare_triple anywhere in this proof:
+the point of the game is to use the Hoare rules as a self-contained logic for reasoning about proragms.
 
 
 ### Formal Decorated Programs
+Our informal conventions for decorated programs amount to a way of "displaying" Hoare triples,
+in which commands are annotated with enough embedded assertions that
+checking the valiadity of a triple is reduced to simple logical and algebraic caculations showing that some assertions imply others.
+
+#### Syntax
+The first thing we need to do is to formalize a variant of the syntax of commands that includes embedded assertions --  decorations.
+We call the new commands `decorated commands`, or `dcoms`.
+
+Where to put assertions in the definition of `dcom`?
+
+In general, we omit the preconditions whenever possible, trying to embed just the postcondition.
+Concretely, we decorate programs as follows...
+- skip
+    skip {{Q}}
+  on the assumption that the precondition will be provided by the context.
+- sequences `d1; d2`
+  need no decorations. Why? 
+  - the precondition of sequence will be provided by the context.
+  - the postcondition of sequence will be provided by the postcondition of its subcommand `d2`.
+- assignment `X := a`
+  is decorated only with its postcondition
+    X := a {{Q}}
+- conditional `if b then d1 else d2`
+  is decorated

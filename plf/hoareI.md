@@ -371,4 +371,46 @@ An assertion `P` is an invariant of `c` if
     {{P}} c {{P}}
 holds. **Note that** in the middle of executing `c`, the invariant might temporarily become false, but by the end of c, it must be restored. 
 
+Consider the following two crucial pieces of information:
+- the loop terminates when `b` becomes false
+- the loop body will be executed only if `b` is true
 
+So the hoare_while rule is:
+        {{P /\ b}} c {{P}}
+---------------------------------- (hoare_while)
+{{P}} while b do c end {{P /\ ~b}}
+
+Note how the Hoare `while` rule combines aspects of `skip` and conditionals:
+- If the loop body executes zero times, the rule is like `skip` in that the precondition survives to become (part of) the postcondition.
+- Like a conditional, we can assume guard `b` holds on entry to the subcommand.
+
+```Coq
+Theorem hoare_while : ∀ P (b:bexp) c,
+  {{P ∧ b}} c {{P}} →
+  {{P}} while b do c end {{P ∧ ¬ b}}.
+Proof.
+  intros P b c Hhoare st st' Heval HP.
+  (* We proceed by induction on Heval, because, in the "keep looping" case,
+     its hypotheses talk about the whole loop instead of just c. The
+     `remember` is used to keep the original command in the hypotheses;
+     otherwise, it would be lost in the induction. By using inversion
+     we clear away all the cases except those involving while. *)
+  remember <{while b do c end}> as original_command eqn:Horig.
+  induction Heval;
+    try (inversion Horig; subst; clear Horig);
+    eauto.
+Qed.
+```
+
+Here is the reason why we need to strengthen the hoare_while rule:
+e.g.:
+`X = 0` is a loop invariant of
+    while X = 2 do X := 1 end
+`X = 0` is not an invariant of `c`, but `X = 0 /\ X = 2` is, then we can say `X = 0` is a loop invariant of this `while` loop.
+
+Recall the definition of `hoare_triple` asserts that
+    the postcondition must hold *only* when the command *terminates*.
+So if the command doesn't terminate, we can prove anything we like about the postcondition.
+
+> Hoare rules that specify what happens *if* commands terminate, **without proving that they do**, are said to describe a logic of partial correctness.
+It is also possible to give Hoare rules for total correctness(out of the scope of this textbook), which additionally specifies that commands must terminate.
