@@ -215,4 +215,125 @@ Concretely, we decorate programs as follows...
   is decorated only with its postcondition
     X := a {{Q}}
 - conditional `if b then d1 else d2`
-  is decorated
+  is decorated with a postcondition for the whole statement
+  as well as preconditions for each branch:
+    if b then {{P1}} d1 else {{P2}} d2 end {{Q}}
+- loop `while b do d end`
+  is decorated with *its postcondition* and *a precondition for the body*:
+    while b do {{P}} d end {{Q}}
+  **The postcondition embedded in d serves as the loop invariant.**
+- implications `->>` can be added as decorations either for a precondition
+    ->> {{P}} d
+  or for a postcondition
+    d ->> {{Q}}
+  The former is waiting for the precondition to eventually be supplied;
+  the latter relies on the postcondition already embedded in `d`.
+
+Here is the formal syntax of decorated commands:
+```Coq
+Inductive dcom : Type :=
+| DCSkip (Q : Assertion) (* skip {{Q}} *)
+| DCSeq  (d1 d2 : dcom) (* d1; d2 *)
+| DCAsgn (X : string) (a : aexp) (Q : Assertion) (* X := a {{Q}} *)
+| DCIf   (b : bexp) (P1 : Assertion) (d1 : dcom)
+         (P2 : Assertion) (d2 : dcom) (Q : Assertion)
+  (* if b then {{P1}} d1 else {{P2}} d2 end {{Q}} *)
+| DCWhile (b : bexp) (P : Assertion) (d : dcom) (Q : Assertion) (* while b do {{P}} d end {{Q}} *)
+| DCPre (P : Assertion) (d : dcom) (* ->> {{P}} d *)
+| DCPost (d : dcom) (Q : Assertion) (* d ->> {{Q}} *)
+```
+
+To provide the initial precondition that goes as the very top of a decorated program,
+we introduce a new type `decorated`:
+```Coq
+Inductive decorated : Type :=
+  | Decorated : Assertion -> dcom -> decorated.
+```
+
+```Coq
+Example dec0 :=
+  <{ skip {{True}} }>.
+Example dec1 :=
+  <{while true do {{True}}} skip {{True}} end
+  {{ True }} >.
+
+Example dec_while : decorated :=
+  <{
+  {{ True }}
+    while X ≠ 0
+    do
+                 {{ True ∧ (X ≠ 0) }}
+      X := X - 1
+                 {{ True }}
+    end
+  {{ True ∧ X = 0}} ->>
+  {{ X = 0 }} }>.
+```
+
+We can use `extract` to extract `com` from a `dcom` by erasing all annotations.
+```Coq
+Fixpoint extract (d : dcom) : com :=
+  match d with
+  | DCSkip _ ⇒ CSkip
+  | DCSeq d1 d2 ⇒ CSeq (extract d1) (extract d2)
+  | DCAsgn X a _ ⇒ CAsgn X a
+  | DCIf b _ d1 _ d2 _ ⇒ CIf b (extract d1) (extract d2)
+  | DCWhile b _ d _ ⇒ CWhile b (extract d)
+  | DCPre _ d ⇒ extract d
+  | DCPost d _ ⇒ extract d
+  end.
+Definition extract_dec (dec : decorated) : com :=
+  match dec with
+  | Decorated P d ⇒ extract d
+  end.
+Example extract_while_ex :
+    extract_dec dec_while
+  = <{while X ≠ 0 do X := X - 1 end}>.
+Proof.
+  unfold dec_while.
+  reflexivity.
+Qed.
+```
+
+It is straightforward to extract the precondition of a `decorated` and the postcondition of a `dcom`.
+```Coq
+Definition pre_dec (dec : decorated) : Assertion :=
+  match dec with
+  | Decorated P d ⇒ P
+  end.
+Fixpoint post (d : dcom) : Assertion :=
+  match d with
+  | DCSkip P ⇒ P
+  | DCSeq _ d2 ⇒ post d2
+  | DCAsgn _ _ Q ⇒ Q
+  | DCIf _ _ _ _ _ Q ⇒ Q
+  | DCWhile _ _ _ Q ⇒ Q
+  | DCPre _ d ⇒ post d
+  | DCPost _ Q ⇒ Q
+  end.
+Definition post_dec (dec : decorated) : Assertion :=
+  match dec with
+  | Decorated P d ⇒ post d
+  end.
+Example pre_dec_while : pre_dec dec_while = True.
+Proof. reflexivity. Qed.
+Example post_dec_while : post_dec dec_while = (X = 0)%assertion.  (* the assertion denotes that the [X = 0] is not the normal `proposition`, but the `assertion` [ {{X = 0}} ](or the desugared version [fun st => aeval st X = 0])*)
+Proof. reflexivity. Qed.
+```
+
+The following expresses the meaning of **a decorated program is correct**:
+```Coq
+Definition outer_triple_valid (dec : decorated) :=
+  {{pre_dec dec}} extract_dec dec {{post_dec dec}}.
+
+Example dec_while_triple_correct :
+     outer_triple_valid dec_while
+   =
+     {{ True }}
+       while X ≠ 0 do X := X - 1 end
+     {{ X = 0 }}.
+```
+The Definition `outer_triple_valid` will take a `decorated` then produce a `hoare_triple`,
+and we all know a `hoare_triple` is just a proposition(`Prop`);
+thus, to show that it is valid, we need to produce a proof of this proposition.
+
